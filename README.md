@@ -60,3 +60,8 @@ python -m unittest discover -s tests -v
 ```
 
 별도 pip 패키지 설치가 필요하지 않습니다.
+
+
+## 한국시간 시작 및 종료 표시
+
+디스코드 알림에 API의 `activation`(등장 시간)과 `expiry`(종료 시간)를 `Asia/Seoul` 기준으로 변환한 `YYYY-MM-DD HH:MM:SS KST` 형식으로 표시합니다. Discord 상대 시각으로 남은 시간도 함께 표시합니다. 이 시각은 GitHub Actions에서 알림을 감지한 시각이 아니라 API에 기록된 미션 시작/종료 시각입니다. 이전에 업로드한 프로젝트를 사용한다면 `warframe_alert.py`만 교체해도 되고, 테스트를 갱신하려면 `tests/test_alert.py`도 교체하세요.

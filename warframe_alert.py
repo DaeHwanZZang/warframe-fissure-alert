@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -11,6 +12,7 @@ from urllib.request import Request, urlopen
 API_URL = "https://api.warframestat.us/pc/fissures"
 LIVE_URL = "https://browse.wf/live"
 STATE_FILE = Path(__file__).with_name("notified_fissures.json")
+KST = ZoneInfo("Asia/Seoul")
 
 
 def get_json(url):
@@ -53,8 +55,14 @@ def post_webhook(webhook_url, payload):
             raise RuntimeError(f"Discord returned HTTP {response.status}")
 
 
+def format_kst(value):
+    return parse_time(value).astimezone(KST).strftime("%Y-%m-%d %H:%M:%S KST")
+
+
 def alert_payload(fissure):
-    expires_at = int(parse_time(fissure["expiry"]).timestamp())
+    started_at = format_kst(fissure["activation"])
+    expires_at = format_kst(fissure["expiry"])
+    expiry_timestamp = int(parse_time(fissure["expiry"]).timestamp())
     return {
         "username": "Warframe 균열 알림",
         "allowed_mentions": {"parse": []},
@@ -65,7 +73,9 @@ def alert_payload(fissure):
                 "**위치:** 투불 광장, 자리만 (Tuvul Commons)\n"
                 "**적 레벨:** 150–155\n"
                 "**난이도:** 강철의 길 (Steel Path)\n"
-                f"**종료:** <t:{expires_at}:R>\n\n"
+                f"**등장 시간:** {started_at}\n"
+                f"**종료 시간:** {expires_at}\n"
+                f"**남은 시간:** <t:{expiry_timestamp}:R>\n\n"
                 f"[현재 균열 확인하기]({LIVE_URL})"
             ),
             "color": 0x3498DB,
@@ -102,8 +112,8 @@ def main():
     for fissure in fissures:
         if not isinstance(fissure, dict) or not target(fissure):
             continue
-        if "id" not in fissure or "expiry" not in fissure:
-            raise ValueError("Target fissure missing id or expiry")
+        if any(k not in fissure for k in ("id", "activation", "expiry")):
+            raise ValueError("Target fissure missing id, activation or expiry")
         if parse_time(fissure["expiry"]) <= now:
             continue
         matched += 1
