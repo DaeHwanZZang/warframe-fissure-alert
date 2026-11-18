@@ -1,0 +1,54 @@
+name: Warframe Tuvul Fissure Alert
+
+on:
+  schedule:
+    # UTC, every 5 minutes. GitHub may delay scheduled jobs.
+    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
+  workflow_dispatch:
+    inputs:
+      test_notification:
+        description: 'Send a Discord test message instead of checking fissures'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: warframe-tuvul-alert
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check fissures or test webhook
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TEST_NOTIFICATION: ${{ inputs.test_notification == true && 'true' || 'false' }}
+        run: python warframe_alert.py
+
+      - name: Commit deduplication state
+        if: ${{ success() && inputs.test_notification != true }}
+        run: |
+          if git diff --quiet -- notified_fissures.json; then
+            echo 'No changes to notification state.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add notified_fissures.json
+          git commit -m 'chore: update notified fissures [skip ci]'
+          git push
